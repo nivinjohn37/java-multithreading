@@ -360,7 +360,7 @@ When a variable is declared as `volatile`:
 ### ✅ Fixing the previous example:
 
 ```java
-class VolatileFix {
+class examples.VolatileFix {
     private static volatile boolean running = true;
 
     public static void main(String[] args) throws InterruptedException {

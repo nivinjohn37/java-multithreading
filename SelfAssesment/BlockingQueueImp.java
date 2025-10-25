@@ -1,4 +1,4 @@
-package examples;
+package SelfAssesment;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -12,7 +12,7 @@ public class BlockingQueueImp {
             this.capacity = capacity;
         }
 
-        public synchronized void enqeue(T value) throws InterruptedException {
+        public synchronized void enqueue(T value) throws InterruptedException {
             while (queue.size() == capacity) {
                 wait();
             }
@@ -22,7 +22,7 @@ public class BlockingQueueImp {
             notifyAll();
         }
 
-        public synchronized T deqeue() throws InterruptedException {
+        public synchronized void dequeue() throws InterruptedException {
             while (queue.isEmpty()) {
                 wait();
             }
@@ -30,7 +30,6 @@ public class BlockingQueueImp {
             System.out.println("Dequeue " + value);
             Thread.sleep(2000);
             notifyAll();
-            return value;
         }
 
     }
@@ -40,7 +39,7 @@ public class BlockingQueueImp {
         Thread t1 = new Thread(() -> {
             for (int i = 0; i < 10; i++) {
                 try {
-                    queue.enqeue(i);
+                    queue.enqueue(i);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -49,7 +48,7 @@ public class BlockingQueueImp {
         Thread t2 = new Thread(() -> {
             for (int i = 0; i < 10; i++) {
                 try{
-                    queue.deqeue();
+                    queue.dequeue();
                 }catch (InterruptedException e){
                     throw new RuntimeException(e);
                 }

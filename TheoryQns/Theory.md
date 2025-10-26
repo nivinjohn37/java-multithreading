@@ -504,6 +504,183 @@ A **livelock** occurs when threads are **not blocked** but keep **changing their
 ✅ Avoided by introducing **random back-off** or **retries with delay**.
 
 ---
+## 🧩 What is a Livelock?
+
+> A **livelock** occurs when two or more threads are **not blocked**, but they keep **responding to each other’s actions** in a way that **prevents progress**.
+
+So unlike a **deadlock**, where threads are *stuck waiting*,
+in a **livelock**, threads are *actively running* — but still doing nothing useful.
+
+---
+
+### ⚙️ Formal Definition
+
+> A situation where threads **continuously change state** in response to each other, but **no thread actually completes its work**.
+
+* The threads **aren’t blocked** (CPU is busy).
+* But they keep **retrying, yielding, or releasing/reacquiring locks** — endlessly.
+* System stays *alive* but makes *no progress*.
+
+---
+
+## 💡 Analogy — The “Polite People Problem”
+
+Two people meet in a narrow hallway:
+
+* Both step aside to let the other pass.
+* Then both step to the same side again.
+* Then back to the other side.
+* They keep doing this — forever politely avoiding each other but **never passing**.
+
+✅ They’re active (not waiting).
+❌ But they make **no forward progress**.
+
+That’s **livelock**.
+
+---
+
+## 🧠 Difference Between Deadlock and Livelock
+
+| Feature          | **Deadlock**           | **Livelock**                  |
+| ---------------- | ---------------------- | ----------------------------- |
+| **Thread state** | Blocked (waiting)      | Running (active)              |
+| **CPU usage**    | 0% (threads idle)      | High (threads spinning)       |
+| **Progress**     | None                   | None                          |
+| **Cause**        | Circular wait on locks | Over-response or retry loops  |
+| **Fix**          | Avoid circular locking | Add random back-off or limits |
+
+---
+
+## 🧩 Example in Java
+
+Here’s a **classic livelock** simulation:
+
+```java
+class Spoon {
+    private Diner owner;
+
+    public Spoon(Diner owner) {
+        this.owner = owner;
+    }
+
+    public Diner getOwner() { return owner; }
+    public void setOwner(Diner d) { owner = d; }
+
+    public synchronized void use() {
+        System.out.println(owner.name + " is eating...");
+    }
+}
+
+class Diner {
+    public String name;
+    public boolean isHungry = true;
+
+    public Diner(String name) {
+        this.name = name;
+    }
+
+    public void eatWith(Spoon spoon, Diner partner) {
+        while (isHungry) {
+            // Wait until we have the spoon
+            if (spoon.getOwner() != this) {
+                try { Thread.sleep(1); } catch (InterruptedException e) {}
+                continue;
+            }
+
+            // If partner is hungry, pass spoon (being polite)
+            if (partner.isHungry) {
+                System.out.println(name + ": You eat first, my friend " + partner.name);
+                spoon.setOwner(partner);
+                continue; // go back and wait
+            }
+
+            // Otherwise, eat
+            spoon.use();
+            isHungry = false;
+            System.out.println(name + ": I’m done eating!");
+            spoon.setOwner(partner);
+        }
+    }
+}
+
+public class LivelockExample {
+    public static void main(String[] args) {
+        final Diner a = new Diner("Alice");
+        final Diner b = new Diner("Bob");
+        final Spoon spoon = new Spoon(a);
+
+        new Thread(() -> a.eatWith(spoon, b)).start();
+        new Thread(() -> b.eatWith(spoon, a)).start();
+    }
+}
+```
+
+### 🧠 What Happens
+
+* Alice and Bob both try to eat using the same spoon.
+* Each one politely checks if the other is hungry.
+* They keep giving the spoon to each other.
+* Both remain hungry **forever** — no one actually eats.
+
+➡️ **Threads are active, not blocked.**
+➡️ **No progress → livelock.**
+
+---
+
+## ⚠️ Symptoms of Livelock
+
+* Threads running but output never completes.
+* CPU usage stays high.
+* Logs show repeating actions (retrying, yielding, releasing, reacquiring).
+
+---
+
+## ✅ How to Avoid Livelock
+
+1. **Add random back-off / delay**
+
+   ```java
+   Thread.sleep(random.nextInt(10));
+   ```
+
+   → So threads don’t retry at the same time.
+
+2. **Use fair locks**
+
+   ```java
+   new ReentrantLock(true); // fair mode
+   ```
+
+3. **Introduce priorities**
+   → Decide deterministically which thread proceeds first.
+
+4. **Timeouts / limited retries**
+   → Avoid infinite retry loops.
+
+5. **Use concurrent utilities**
+   → Classes like `BlockingQueue`, `Semaphore`, and `Lock` handle fairness internally.
+
+---
+
+## 🧩 Quick Recap Table
+
+| Aspect       | Deadlock                      | Livelock                             |
+| ------------ | ----------------------------- | ------------------------------------ |
+| Thread State | Blocked                       | Runnable                             |
+| CPU Usage    | Idle                          | Busy                                 |
+| Progress     | None                          | None                                 |
+| Cause        | Circular waiting              | Over-response or retry               |
+| Detection    | Thread dump (waiting threads) | Harder (threads running but looping) |
+| Fix          | Lock ordering                 | Back-off / fairness                  |
+
+---
+
+## ✅ In One Line
+
+> 🔹 **Deadlock:** “Both stuck waiting.”
+> 🔹 **Livelock:** “Both moving but getting nowhere.”
+
+---
 
 ### **36. What is `BlockingQueue`?**
 
@@ -705,6 +882,301 @@ If you override `run()` → custom code executes in the thread.
 | Thread Control  | `sleep()`, `join()`, `yield()`                 | Execution control      |
 | Thread Safety   | `volatile`, `Atomic*`, `ThreadLocal`           | Memory & visibility    |
 | Concurrency     | `ExecutorService`, `ConcurrentHashMap`         | High-level parallelism |
+
+---
+
+Absolutely ✅ — here’s a **complete theory Q&A set** covering all three key synchronization constructs in Java:
+**Semaphore**, **CountDownLatch**, and **CyclicBarrier** — explained in clear interview style with differences, use cases, and examples.
+
+---
+
+# 🧩 Java Concurrency Constructs — Theory Q&A
+
+---
+
+## **1️⃣ Semaphore**
+
+### **Q1: What is a Semaphore in Java?**
+
+A **Semaphore** is a synchronization aid that controls **how many threads can access a shared resource** at the same time.
+
+It maintains a set of **permits** — each thread must acquire a permit before proceeding and release it when done.
+
+---
+
+### **Q2: How does Semaphore work internally?**
+
+* Initialized with a number of permits (e.g., `new Semaphore(3)`).
+* Each `acquire()` call decreases the permit count.
+* Each `release()` call increases the permit count.
+* When no permits are available, threads calling `acquire()` **block** until one is released.
+
+---
+
+### **Q3: What are the main methods of Semaphore?**
+
+| Method               | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `acquire()`          | Blocks until a permit is available.                      |
+| `tryAcquire()`       | Attempts to acquire a permit immediately (non-blocking). |
+| `release()`          | Releases a permit.                                       |
+| `availablePermits()` | Returns number of remaining permits.                     |
+
+---
+
+### **Q4: What are the types of Semaphores?**
+
+| Type                   | Description                                                |
+| ---------------------- | ---------------------------------------------------------- |
+| **Counting Semaphore** | Has multiple permits (controls limited concurrent access). |
+| **Binary Semaphore**   | Has one permit; acts like a mutex (mutual exclusion).      |
+
+---
+
+### **Q5: What problems does a Semaphore solve?**
+
+1. **Limiting concurrency** (e.g., only 3 threads access DB at a time).
+2. **Resource pooling** (e.g., connection pool).
+3. **Rate limiting / throttling**.
+4. **Signaling between threads** (e.g., one thread releases permit after event).
+
+---
+
+### **Q6: What’s the difference between Semaphore and Lock?**
+
+| Feature   | **Semaphore**                             | **Lock**                |
+| --------- | ----------------------------------------- | ----------------------- |
+| Permits   | Multiple (configurable)                   | Single                  |
+| Ownership | No concept of ownership                   | Owned by a thread       |
+| Purpose   | Limit concurrency or signal               | Mutual exclusion        |
+| Fairness  | Optional (`new Semaphore(permits, true)`) | Usually fair by default |
+
+---
+
+### **Q7: Example of Semaphore**
+
+```java
+Semaphore parkingLot = new Semaphore(3);
+
+Runnable car = () -> {
+    try {
+        parkingLot.acquire();
+        System.out.println(Thread.currentThread().getName() + " parked.");
+        Thread.sleep(2000);
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    } finally {
+        System.out.println(Thread.currentThread().getName() + " leaving.");
+        parkingLot.release();
+    }
+};
+
+for (int i = 1; i <= 6; i++) {
+    new Thread(car, "Car-" + i).start();
+}
+```
+
+✅ Allows only 3 cars (threads) at a time; others wait.
+
+---
+
+## **2️⃣ CountDownLatch**
+
+### **Q1: What is CountDownLatch in Java?**
+
+A **CountDownLatch** allows one or more threads to **wait until a set of other threads finish their tasks**.
+
+It’s initialized with a count.
+Each call to `countDown()` decreases the count.
+Threads calling `await()` are blocked until the count reaches zero.
+
+---
+
+### **Q2: How does CountDownLatch work?**
+
+1. `CountDownLatch latch = new CountDownLatch(3);`
+2. Worker threads perform work and call `latch.countDown()`.
+3. Main thread calls `latch.await()` and waits.
+4. When count = 0 → latch releases all waiting threads.
+
+---
+
+### **Q3: What are its main methods?**
+
+| Method        | Description                      |
+| ------------- | -------------------------------- |
+| `await()`     | Waits until the count reaches 0. |
+| `countDown()` | Decrements the count by one.     |
+| `getCount()`  | Returns the current count.       |
+
+---
+
+### **Q4: What are typical use cases of CountDownLatch?**
+
+| Use Case                  | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| **Start coordination**    | Wait for multiple services to start before continuing.    |
+| **End coordination**      | Wait for multiple tasks to finish before merging results. |
+| **Testing parallel code** | Hold threads until “start” signal released.               |
+
+---
+
+### **Q5: Is CountDownLatch reusable?**
+
+❌ No.
+Once the count reaches 0, it cannot be reset.
+You’d need a new instance for the next cycle.
+
+---
+
+### **Q6: Example**
+
+```java
+CountDownLatch latch = new CountDownLatch(3);
+
+for (int i = 1; i <= 3; i++) {
+    new Thread(() -> {
+        System.out.println(Thread.currentThread().getName() + " working...");
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        latch.countDown();
+    }, "Worker-" + i).start();
+}
+
+System.out.println("Main thread waiting...");
+latch.await();
+System.out.println("All workers done. Proceeding!");
+```
+
+✅ Main thread waits until all 3 workers call `countDown()`.
+
+---
+
+### **Q7: Common Interview Question**
+
+> What is the difference between `await()` and `countDown()`?
+
+* `await()` → used by the thread that *waits*.
+* `countDown()` → used by the threads that *signal completion*.
+
+---
+
+## **3️⃣ CyclicBarrier**
+
+### **Q1: What is a CyclicBarrier in Java?**
+
+A **CyclicBarrier** allows a fixed number of threads to **wait for each other** to reach a common barrier point before continuing execution.
+
+Once all threads reach the barrier:
+
+* The barrier is **tripped**.
+* All threads are **released simultaneously**.
+* The barrier **resets automatically** (hence *cyclic*).
+
+---
+
+### **Q2: How does CyclicBarrier differ from CountDownLatch?**
+
+| Feature            | **CyclicBarrier**                                  | **CountDownLatch**               |
+| ------------------ | -------------------------------------------------- | -------------------------------- |
+| **Purpose**        | Make threads wait for each other                   | Make one thread wait for others  |
+| **Resettable**     | ✅ Yes (cyclic)                                     | ❌ No (one-time)                  |
+| **Thread roles**   | All are peers (no master thread)                   | Usually one waits, others signal |
+| **Barrier Action** | Optional Runnable executed when all threads arrive | None                             |
+
+---
+
+### **Q3: Constructor**
+
+```java
+CyclicBarrier barrier = new CyclicBarrier(int parties);
+CyclicBarrier barrier = new CyclicBarrier(int parties, Runnable action);
+```
+
+* `parties`: number of threads that must call `await()` before barrier trips.
+* `action`: optional task executed once when barrier trips.
+
+---
+
+### **Q4: Key Methods**
+
+| Method               | Description                                                 |
+| -------------------- | ----------------------------------------------------------- |
+| `await()`            | Thread waits until all parties reach the barrier.           |
+| `reset()`            | Manually resets the barrier.                                |
+| `getNumberWaiting()` | Returns number of threads currently waiting.                |
+| `isBroken()`         | Returns true if barrier is broken (e.g., thread timed out). |
+
+---
+
+### **Q5: Example**
+
+```java
+import java.util.concurrent.*;
+
+CyclicBarrier barrier = new CyclicBarrier(3, 
+    () -> System.out.println("All threads arrived! Moving to next phase."));
+
+for (int i = 1; i <= 3; i++) {
+    new Thread(() -> {
+        try {
+            System.out.println(Thread.currentThread().getName() + " reached barrier.");
+            barrier.await();
+            System.out.println(Thread.currentThread().getName() + " continues work...");
+        } catch (Exception e) {}
+    }, "Thread-" + i).start();
+}
+```
+
+✅ All 3 threads wait at the barrier.
+✅ When the last one arrives, they all proceed together.
+
+---
+
+### **Q6: Why is it called “cyclic”?**
+
+Because once all threads pass the barrier, it **resets automatically**,
+allowing reuse for the next cycle or phase — unlike `CountDownLatch`.
+
+---
+
+### **Q7: What happens if one thread fails before reaching the barrier?**
+
+* The barrier becomes **broken**.
+* Other threads waiting on `await()` get a `BrokenBarrierException`.
+* Use `barrier.reset()` to reuse it again.
+
+---
+
+### **Q8: Typical Use Cases**
+
+| Scenario                 | Description                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| **Parallel computation** | Divide work among threads, wait at barrier to merge results. |
+| **Simulation/game loop** | All threads update their components each frame, then sync.   |
+| **Phased execution**     | Perform multiple stages of work synchronously.               |
+
+---
+
+## 🧠 Final Comparison Table
+
+| Feature                  | **Semaphore**                       | **CountDownLatch**              | **CyclicBarrier**                                |
+| ------------------------ | ----------------------------------- | ------------------------------- | ------------------------------------------------ |
+| **Purpose**              | Limit concurrent access to resource | Wait until other threads finish | Wait for all threads to reach a common point     |
+| **Synchronization Type** | Signaling / Resource management     | One-way countdown               | Two-way mutual wait                              |
+| **Threads Blocked**      | Threads acquiring permits           | Thread(s) calling `await()`     | All threads calling `await()`                    |
+| **Reusable?**            | ✅ Yes                               | ❌ No                            | ✅ Yes                                            |
+| **Key Methods**          | `acquire()`, `release()`            | `countDown()`, `await()`        | `await()`, `reset()`                             |
+| **Barrier Action**       | ❌ None                              | ❌ None                          | ✅ Optional Runnable                              |
+| **Use Case**             | Limit access (DB pool, throttling)  | Wait for workers (startup sync) | Multi-thread coordination (parallel phase tasks) |
+| **Analogy**              | Parking lot with N spots            | Countdown timer                 | Group meeting point                              |
+
+---
+
+### 🧠 In One Line Summaries
+
+* **Semaphore** → “Allow only N threads in at once.”
+* **CountDownLatch** → “Wait until everyone finishes, then go.”
+* **CyclicBarrier** → “Wait until everyone *arrives*, then all go together.”
 
 ---
 

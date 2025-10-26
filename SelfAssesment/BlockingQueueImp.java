@@ -22,7 +22,7 @@ public class BlockingQueueImp {
             notifyAll();
         }
 
-        public synchronized void dequeue() throws InterruptedException {
+        public synchronized T dequeue() throws InterruptedException {
             while (queue.isEmpty()) {
                 wait();
             }
@@ -30,6 +30,7 @@ public class BlockingQueueImp {
             System.out.println("Dequeue " + value);
             Thread.sleep(2000);
             notifyAll();
+            return value;
         }
 
     }
